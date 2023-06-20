@@ -2,6 +2,7 @@ import gradio as gr
 from refacer import Refacer
 import argparse
 import multiprocessing as mp
+import os
 
 parser = argparse.ArgumentParser(description='Refacer')
 parser.add_argument("--max_num_faces", help="Max number of faces on UI", type=int, default=8)
@@ -26,6 +27,7 @@ def run(*vars):
     origins=vars[1:(num_faces+1)]
     destinations=vars[(num_faces+1):(num_faces*2)+1]
     thresholds=vars[(num_faces*2)+1:]
+    upscaler=vars[-1]
 
     faces = []
     for k in range(0,num_faces):
@@ -36,11 +38,15 @@ def run(*vars):
                 'threshold':thresholds[k]
             })
 
-    return refacer.reface(video_path,faces)
+    return refacer.reface(video_path,faces,upscaler)
 
 origin = []
 destination = []
 thresholds = []
+upscaler = []
+models_ESRGAN = ['None']
+models_ESRGAN += [file for file in os.listdir('models_ESRGAN') if file.endswith('.onnx')]
+print(models_ESRGAN)
 
 with gr.Blocks() as demo:
     with gr.Row():
@@ -56,6 +62,8 @@ with gr.Blocks() as demo:
                 destination.append(gr.Image(label="Лицо, на которое надо заменить"))
             with gr.Row():
                 thresholds.append(gr.Slider(label="Порог",minimum=0.0,maximum=1.0,value=0.2))
+    with gr.Row():
+        upscaler.append(gr.Radio(label="Upscaler", choices=models_ESRGAN, value=models_ESRGAN[0], interactive=True))
     with gr.Row():
         button=gr.Button("Начать обработку", variant="primary")
 
