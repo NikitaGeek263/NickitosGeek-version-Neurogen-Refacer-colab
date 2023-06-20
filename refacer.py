@@ -7,6 +7,7 @@ from scrfd import SCRFD
 from arcface_onnx import ArcFaceONNX
 import os.path as osp
 import os
+import platform
 from pathlib import Path
 from tqdm import tqdm
 import ffmpeg
@@ -19,19 +20,24 @@ from enum import Enum
 from insightface.app.common import Face
 from insightface.utils.storage import ensure_available
 import re
+import argparse
 import subprocess
+import numpy as np
 
 class RefacerMode(Enum):
      CPU, CUDA, COREML, TENSORRT = range(1, 5)
 
 class Refacer:
-    def __init__(self,force_cpu=False,colab_performance=False):
+    def __init__(self,force_cpu=False,tensorrt=False,gpu_threads=1,max_memory=8000):
         self.first_face = False
         self.force_cpu = force_cpu
-        self.colab_performance = colab_performance
+        self.gpu_threads = gpu_threads
+        self.max_memory = max_memory
+        self.tensorrt = tensorrt
         self.__check_encoders()
         self.__check_providers()
-        self.total_mem = psutil.virtual_memory().total
+        self.__limit_resources()
+        self.total_mem = self.__limit_resources() #psutil.virtual_memory().total
         self.__init_apps()
 
     def __check_providers(self):
@@ -41,28 +47,54 @@ class Refacer:
             self.providers = rt.get_available_providers()
         rt.set_default_logger_severity(4)
         self.sess_options = rt.SessionOptions()
-        self.sess_options.execution_mode = rt.ExecutionMode.ORT_SEQUENTIAL
+        self.sess_options.execution_mode = rt.ExecutionMode.ORT_PARALLEL
         self.sess_options.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+        # Get the number of threads from the argument parser
 
         if len(self.providers) == 1 and 'CPUExecutionProvider' in self.providers:
             self.mode = RefacerMode.CPU
             self.use_num_cpus = mp.cpu_count()-1
             self.sess_options.intra_op_num_threads = int(self.use_num_cpus/3)
             print(f"CPU mode with providers {self.providers}")
-        elif self.colab_performance:
+        elif self.tensorrt:
             self.mode = RefacerMode.TENSORRT
-            self.use_num_cpus = mp.cpu_count()-1
+            self.providers = [
+            ('TensorrtExecutionProvider', {
+             'trt_engine_cache_enable': True,
+             'trt_engine_cache_path':'./trtcache',
+            })
+        ]
+            self.use_num_cpus = self.gpu_threads
             self.sess_options.intra_op_num_threads = int(self.use_num_cpus/3)
             print(f"TENSORRT mode with providers {self.providers}")
         elif 'CoreMLExecutionProvider' in self.providers:
             self.mode = RefacerMode.COREML
-            self.use_num_cpus = mp.cpu_count()-1
+            self.use_num_cpus = self.gpu_threads
             self.sess_options.intra_op_num_threads = int(self.use_num_cpus/3)
             print(f"CoreML mode with providers {self.providers}")
         elif 'CUDAExecutionProvider' in self.providers:
             self.mode = RefacerMode.CUDA
-            self.use_num_cpus = 1
-            self.sess_options.intra_op_num_threads = 1
+            self.providers = [
+            #('TensorrtExecutionProvider', {
+            # 'device_id': 0,
+            # 'trt_max_workspace_size': 2147483648,
+            # 'trt_fp16_enable': True,
+            # 'trt_engine_cache_enable': True,
+            # 'trt_engine_cache_path':'./trtcache',
+            #}),
+            ('CUDAExecutionProvider', {
+                'device_id': 0,
+                'enable_cuda_graph': 0,
+                'tunable_op_enable': 1, 
+                'tunable_op_tuning_enable': 1,
+                'cudnn_conv1d_pad_to_nc1d': 1,
+                'cudnn_conv_algo_search': 'EXHAUSTIVE',
+            })
+        ]
+            self.use_num_cpus = self.gpu_threads
+            self.sess_options.intra_op_num_threads = self.gpu_threads
+            print(f"Total CUDA threads: {self.use_num_cpus}")
             if 'TensorrtExecutionProvider' in self.providers:
                 self.providers.remove('TensorrtExecutionProvider')
             print(f"CUDA mode with providers {self.providers}")
@@ -75,7 +107,6 @@ class Refacer:
             self.sess_options.intra_op_num_threads = int(self.use_num_cpus/3)
             print(f"TENSORRT mode with providers {self.providers}")
         """
-        
 
     def __init_apps(self):
         assets_dir = ensure_available('models', 'buffalo_l', root='~/.insightface')
@@ -114,7 +145,6 @@ class Refacer:
             if len(_faces)<1:
                 raise Exception('No face detected on "Destination face" image')
             self.replacement_faces.append((feat_original,_faces[0],face_threshold))
-
     def __convert_video(self,video_path,output_video_path):
         if self.video_has_audio:
             print("Merging audio with the refaced video...")
@@ -130,11 +160,8 @@ class Refacer:
         
         print(f"The process has finished.\nThe refaced video can be found at {os.path.abspath(new_path)}")
         return new_path
-
     def __get_faces(self,frame,max_num=0):
-
         bboxes, kpss = self.face_detector.detect(frame,max_num=max_num,metric='default')
-
         if bboxes.shape[0] == 0:
             return []
         ret = []
@@ -148,7 +175,6 @@ class Refacer:
             face.embedding = self.rec_app.get(frame, kps)
             ret.append(face)
         return ret
-
     def process_faces(self,frame):
         max_num=0
         if self.first_face:
@@ -165,19 +191,27 @@ class Refacer:
                     if sim>=rep_face[2]:
                         frame = self.face_swapper.get(frame, face, rep_face[1], paste_back=True)
         return frame
-
     def __check_video_has_audio(self,video_path):
         self.video_has_audio = False
         probe = ffmpeg.probe(video_path)
         audio_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'audio'), None)
         if audio_stream is not None:
             self.video_has_audio = True
-        
-    def reface_group(self, faces, frames, output):
-        with ThreadPoolExecutor(max_workers = self.use_num_cpus) as executor:
-            results = list(tqdm(executor.map(self.process_faces, frames), total=len(frames),desc="Processing frames"))
-            for result in results:
-                output.write(result)
+
+    def __limit_resources(self):
+        # prevent tensorflow memory leak
+        #gpus = tensorflow.config.experimental.list_physical_devices('GPU')
+       # for gpu in gpus:
+           # tensorflow.config.experimental.set_memory_growth(gpu, True)
+        if self.max_memory:
+            memory = self.max_memory * 1024 * 1024 * 1024
+            if str(platform.system()).lower() == 'windows':
+                import ctypes
+                kernel32 = ctypes.windll.kernel32
+                kernel32.SetProcessWorkingSetSize(-1, ctypes.c_size_t(memory), ctypes.c_size_t(memory))
+            else:
+                import resource
+                resource.setrlimit(resource.RLIMIT_DATA, (memory, memory))
 
     def reface(self, video_path, faces):
         self.__check_video_has_audio(video_path)
@@ -205,17 +239,16 @@ class Refacer:
                     pbar.update()
                 else:
                     break
-                if (len(frames) > 1000):
-                    self.reface_group(faces,frames,output)
-                    frames=[]
-
             cap.release()
             pbar.close()
 
-        self.reface_group(faces,frames,output)
-        frames=[]
-        output.release()
-        
+        with ThreadPoolExecutor(max_workers = self.gpu_threads) as executor:
+            print(f"Задействовано {self.gpu_threads} потоков")
+            results = list(tqdm(executor.map(self.process_faces, frames), total=len(frames),desc="Processing frames"))
+            for result in results:
+                output.write(result)
+            output.release()
+
         return self.__convert_video(video_path,output_video_path)
     
     def __try_ffmpeg_encoder(self, vcodec):
@@ -232,7 +265,6 @@ class Refacer:
     def __check_encoders(self):
         self.ffmpeg_video_encoder='libx264'
         self.ffmpeg_video_bitrate='0'
-
         pattern = r"encoders: ([a-zA-Z0-9_]+(?: [a-zA-Z0-9_]+)*)"
         command = ['ffmpeg', '-codecs', '--list-encoders']
         commandout = subprocess.run(command, check=True, capture_output=True).stdout
@@ -248,7 +280,6 @@ class Refacer:
                                 self.ffmpeg_video_bitrate=Refacer.VIDEO_CODECS[v_k]
                                 print(f"Video codec for FFMPEG: {self.ffmpeg_video_encoder}")
                                 return
-
     VIDEO_CODECS = {
          'h264_videotoolbox':'0', #osx HW acceleration
          'h264_nvenc':'0', #NVIDIA HW acceleration
