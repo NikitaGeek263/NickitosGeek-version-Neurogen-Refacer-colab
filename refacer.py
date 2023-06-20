@@ -212,7 +212,14 @@ class Refacer:
             else:
                 import resource
                 resource.setrlimit(resource.RLIMIT_DATA, (memory, memory))
-
+                 
+    def reface_group(self, faces, frames, output):
+        with ThreadPoolExecutor(max_workers = self.gpu_threads) as executor:
+            print(f"Задействовано {self.gpu_threads} потоков")
+            results = list(tqdm(executor.map(self.process_faces, frames), total=len(frames),desc="Processing frames"))
+            for result in results:
+                output.write(result)
+     
     def reface(self, video_path, faces):
         self.__check_video_has_audio(video_path)
         output_video_path = os.path.join('out',Path(video_path).name)
@@ -239,17 +246,19 @@ class Refacer:
                     pbar.update()
                 else:
                     break
+                if (len(frames) > 1000):
+                    self.reface_group(faces,frames,output)
+                    frames=[]
+
             cap.release()
             pbar.close()
 
-        with ThreadPoolExecutor(max_workers = self.gpu_threads) as executor:
-            print(f"Задействовано {self.gpu_threads} потоков")
-            results = list(tqdm(executor.map(self.process_faces, frames), total=len(frames),desc="Processing frames"))
-            for result in results:
-                output.write(result)
-            output.release()
-
+        self.reface_group(faces,frames,output)
+        frames=[]
+        output.release()
+        
         return self.__convert_video(video_path,output_video_path)
+
     
     def __try_ffmpeg_encoder(self, vcodec):
         print(f"Trying FFMPEG {vcodec} encoder")
