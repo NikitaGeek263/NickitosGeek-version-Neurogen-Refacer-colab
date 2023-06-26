@@ -12,12 +12,13 @@
 ## Инструкция для Nvidia:
 Требования к системе:
 
-Установленный Python 3.10 ( https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe )
-Установленный Git ( https://github.com/git-for-windows/git/releases/download/v2.41.0.windows.1/Git-2.41.0-64-bit.exe )
-Установленная Visual Studio (https://visualstudio.microsoft.com/ru/vs/community/)
-Установленный CUDA Toolkit 11.8 (https://developer.nvidia.com/cuda-11-8-0-download-archive)
-Установленные CUDNN
-Установленный ffmpeg (https://github.com/BtbN/FFmpeg-Builds/releases)
+- Установленный Python 3.10 ( https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe )
+- Установленный Git ( https://github.com/git-for-windows/git/releases/download/v2.41.0.windows.1/Git-2.41.0-64-bit.exe )
+- Установленная Visual Studio (https://visualstudio.microsoft.com/ru/vs/community/)
+- Установленный CUDA Toolkit 11.8 (https://developer.nvidia.com/cuda-11-8-0-download-archive)
+- Установленные CUDNN
+- Установленный ffmpeg (https://github.com/BtbN/FFmpeg-Builds/releases)
+- 
 Подготовка с нуля (если вы раньше не работали с нейронками): Выполните пункты с 1 по 4 https://pikabu.ru/story/prodolzhenie_posta_polzovatel_sozdal_skript_kotoryiy_pozvolyaet_sozdavat_deepfake_v_odin_klik_kachestvo_kak_po_mne_otlichnoe_i_prevoskhodit_predyidushchie_resheniya_10282774 Затем следующие шаги:
 
 Установите Cuda Toolkit 11.8: https://developer.nvidia.com/cuda-11-8-0-download-archive
