@@ -1,4 +1,33 @@
 # Refacer: One-Click Deepfake Multi-Face Swap Tool
+## RU:
+
+Эта сборка переведена на русский язык, а также имеет ряд оптимизаций в виде управления количества потоков, ограничения оперативнйо памяти и т.д. 
+[Видеобзор](https://www.youtube.com/watch?v=35BUWZv7Ybc&t=143s)
+
+[Мой телеграм канал](https://t.me/neurogen_news)
+
+Если у вас возникли трудности с установкой обычной версии, рекомендую скачать портативную, в которой уже все включено и она не требует установки. Скачать можно тут:
+[Яндекс Диск](https://disk.yandex.ru/d/xs1okpmY1MCtjQ) | [MEGA](https://mega.nz/folder/OYoDGYSB#4MxhCQU2Ie8J2w3Cn9xLNQ)
+
+## Инструкция для Nvidia:
+Требования к системе:
+
+Установленный Python 3.10 ( https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe )
+Установленный Git ( https://github.com/git-for-windows/git/releases/download/v2.41.0.windows.1/Git-2.41.0-64-bit.exe )
+Установленная Visual Studio (https://visualstudio.microsoft.com/ru/vs/community/)
+Установленный CUDA Toolkit 11.8 (https://developer.nvidia.com/cuda-11-8-0-download-archive)
+Установленные CUDNN
+Установленный ffmpeg (https://github.com/BtbN/FFmpeg-Builds/releases)
+Подготовка с нуля (если вы раньше не работали с нейронками): Выполните пункты с 1 по 4 https://pikabu.ru/story/prodolzhenie_posta_polzovatel_sozdal_skript_kotoryiy_pozvolyaet_sozdavat_deepfake_v_odin_klik_kachestvo_kak_po_mne_otlichnoe_i_prevoskhodit_predyidushchie_resheniya_10282774 Затем следующие шаги:
+
+Установите Cuda Toolkit 11.8: https://developer.nvidia.com/cuda-11-8-0-download-archive
+Скачайте CUDNN: https://developer.nvidia.com/downloads/compute/cudnn/secure/8.9.1/local_installers/11.8/cudnn-windows-x86_64-8.9.1.23_cuda11-archive.zip/ После чего распакуйте архив, откройте папку bin и скопируйте файлы в папку C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\bin
+Запуск:
+
+Запустите файл install.bat
+Внесите под себя правки в файле start_cuda.bat и запустите его.
+
+## EN:
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/xaviviro/refacer/blob/master/notebooks/Refacer_colab.ipynb)
 
