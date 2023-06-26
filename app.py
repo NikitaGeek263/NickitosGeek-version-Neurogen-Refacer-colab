@@ -14,11 +14,12 @@ parser.add_argument("--server_port", help="Server port", type=int, default=7860)
 parser.add_argument("--tensorrt", help="TensorRT activate", default=False,action="store_true")
 parser.add_argument("--gpu-threads", help="number of threads to be use for the GPU", dest="gpu_threads", type=int, default=1)
 parser.add_argument('--max-memory', help='maximum amount of RAM in GB to be used', dest='max_memory', type=int)
+parser.add_argument('--video_quality', help='настроить качество выходного видео', dest='video_quality', type=int, default=18, choices=range(52), metavar='[0-51]')
 #parser.add_argument("--mem", help="Max memory", dest="cpu_threads", type=int, default=4)
 
 args = parser.parse_args()
 
-refacer = Refacer(force_cpu=args.force_cpu,tensorrt=args.tensorrt,gpu_threads=args.gpu_threads,max_memory=args.max_memory)
+refacer = Refacer(force_cpu=args.force_cpu,tensorrt=args.tensorrt,gpu_threads=args.gpu_threads,max_memory=args.max_memory,video_quality=args.video_quality)
 
 num_faces=args.max_num_faces
 
@@ -28,7 +29,7 @@ def run(*vars):
     destinations=vars[(num_faces+1):(num_faces*2)+1]
     thresholds=vars[(num_faces*2)+1:]
     upscaler=vars[-1]
-
+    
     faces = []
     for k in range(0,num_faces):
         if origins[k] is not None and destinations[k] is not None:
@@ -38,15 +39,17 @@ def run(*vars):
                 'threshold':thresholds[k]
             })
 
-    return refacer.reface(video_path,faces,upscaler)
+    # Преобразование upscaler в строку
+    return refacer.reface(video_path,faces,str(upscaler))
 
 origin = []
 destination = []
 thresholds = []
 upscaler = []
-models_ESRGAN = ['None']
-models_ESRGAN += [file for file in os.listdir('models_ESRGAN') if file.endswith('.onnx')]
-print(models_ESRGAN)
+upscaler = []
+upscaler_models = ['None']
+upscaler_models += [file for file in os.listdir('upscaler_models') if file.endswith('.onnx')]
+print(upscaler_models)
 
 with gr.Blocks() as demo:
     with gr.Row():
@@ -63,14 +66,16 @@ with gr.Blocks() as demo:
             with gr.Row():
                 thresholds.append(gr.Slider(label="Порог",minimum=0.0,maximum=1.0,value=0.2))
     with gr.Row():
-        upscaler.append(gr.Radio(label="Upscaler", choices=models_ESRGAN, value=models_ESRGAN[0], interactive=True))
+        #upscaler.append(gr.Radio(label="Upscaler", choices=models_ESRGAN, value=models_ESRGAN[0], interactive=True))
+        upscaler.append(gr.Dropdown(label="Выберите модель апскейлера", choices=upscaler_models, value=upscaler_models[0], interactive=True))
     with gr.Row():
         button=gr.Button("Начать обработку", variant="primary")
 
-    button.click(fn=run,inputs=[video]+origin+destination+thresholds,outputs=[video2])
+    button.click(fn=run,inputs=[video]+origin+destination+thresholds+upscaler,outputs=[video2])
     
 #demo.launch(share=True,server_name="0.0.0.0", show_error=True)
-demo.queue().launch(show_error=True,share=args.share_gradio,server_name=args.server_name,server_port=args.server_port,inbrowser=args.autolaunch)
+demo.queue().launch(show_error=True,share=args.share_gradio,server_name=args.server_name,inbrowser=args.autolaunch)
 
 #demo.launch(share=True,server_name="0.0.0.0", show_error=True)
 #demo.queue().launch(show_error=True,share=False,inbrowser=True)
+#e().launch(show_error=True,share=False,inbrowser=True)
