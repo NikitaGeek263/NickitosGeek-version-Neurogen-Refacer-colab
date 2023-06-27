@@ -32,6 +32,11 @@
 
 Запустите файл install.bat
 
+Скачайте [inswapper_128.onnx](https://github.com/Em1tSan/refacer-ru/releases/download/1.3/inswapper_128.onnx) и поместите его в корневую папку refacer
+
+Скачайте [upscaler_models.zip](https://github.com/Em1tSan/refacer-ru/releases/download/1.3/upscaler_models.zip) и скопируйте содержимое архива в корневую папку refacer
+
+
 Внесите под себя правки в файле start_cuda.bat и запустите его.
 
 ## EN:
