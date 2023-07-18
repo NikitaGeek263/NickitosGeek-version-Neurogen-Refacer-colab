@@ -20,7 +20,6 @@ from enum import Enum
 from insightface.app.common import Face
 from insightface.utils.storage import ensure_available
 import re
-import argparse
 import subprocess
 
 import numpy as np
@@ -32,13 +31,14 @@ class RefacerMode(Enum):
      CPU, CUDA, COREML, TENSORRT = range(1, 5)
 
 class Refacer:
-    def __init__(self,force_cpu=False,tensorrt=False,gpu_threads=4,max_memory=8000,video_quality=18):
+    def __init__(self,force_cpu=False,tensorrt=False,gpu_threads=4,max_memory=8000,video_quality=10,frame_limit=1000):
         self.first_face = False
         self.force_cpu = force_cpu
         self.gpu_threads = gpu_threads
         self.max_memory = max_memory
         self.tensorrt = tensorrt
         self.video_quality = video_quality
+        self.frame_limit = frame_limit
         self.__check_encoders()
         self.__check_providers()
         self.__limit_resources()
@@ -52,7 +52,7 @@ class Refacer:
             self.providers = rt.get_available_providers()
         rt.set_default_logger_severity(4)
         self.sess_options = rt.SessionOptions()
-        self.sess_options.execution_mode = rt.ExecutionMode.ORT_PARALLEL
+        self.sess_options.execution_mode = rt.ExecutionMode.ORT_SEQUENTIAL
         self.sess_options.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_ALL
 
         # Get the number of threads from the argument parser
@@ -81,17 +81,10 @@ class Refacer:
         elif 'CUDAExecutionProvider' in self.providers:
             self.mode = RefacerMode.CUDA
             self.providers = [
-            #('TensorrtExecutionProvider', {
-            # 'device_id': 0,
-            # 'trt_max_workspace_size': 2147483648,
-            # 'trt_fp16_enable': True,
-            # 'trt_engine_cache_enable': True,
-            # 'trt_engine_cache_path':'./trtcache',
-            #}),
             ('CUDAExecutionProvider', {
                 'tunable_op_enable': 1, 
                 'tunable_op_tuning_enable': 1,
-                'cudnn_conv1d_pad_to_nc1d': 1,
+                'cudnn_conv1d_pad_to_nc1d': 0,
                 'cudnn_conv_algo_search': 'EXHAUSTIVE',
             })
         ]
@@ -191,7 +184,7 @@ class Refacer:
         IM = cv2.invertAffineTransform(M_scale)
 
         face_matte = np.full((target_img.shape[0],target_img.shape[1]), 255, dtype=np.uint8)
-
+        
         ##Generate white square sized as a upsk_face
         img_matte = np.full((upsk_face.shape[0],upsk_face.shape[1]), 255, dtype=np.uint8) 
         ##Transform white square back to target_img
@@ -213,7 +206,7 @@ class Refacer:
         kernel_size = (k, k)
         blur_size = tuple(2*i+1 for i in kernel_size)
         img_matte = cv2.GaussianBlur(img_matte, blur_size, 0)
-
+        
         #Normalize images to float values and reshape
         img_matte = img_matte.astype(np.float32)/255
         face_matte = face_matte.astype(np.float32)/255
@@ -326,7 +319,7 @@ class Refacer:
                     pbar.update()
                 else:
                     break
-                if (len(frames) > 1000):
+                if (len(frames) > self.frame_limit):
                     self.reface_group(faces,frames,output)
                     frames=[]
 
@@ -342,7 +335,7 @@ class Refacer:
     
     def __try_ffmpeg_encoder(self, vcodec):
         print(f"Trying FFMPEG {vcodec} encoder")
-        command = ['ffmpeg', '-y', "-hwaccel auto", '-f','lavfi','-i','testsrc=duration=1:size=1280x720:rate=30','-vcodec',vcodec,'testsrc.mp4']
+        command = ['ffmpeg', '-y', '-f','lavfi','-i','testsrc=duration=1:size=1280x720:rate=30','-vcodec',vcodec,'testsrc.mp4']
         try:
             subprocess.run(command, check=True, capture_output=True).stderr
         except subprocess.CalledProcessError as e:

@@ -14,12 +14,13 @@ parser.add_argument("--server_port", help="Server port", type=int, default=7860)
 parser.add_argument("--tensorrt", help="TensorRT activate", default=False,action="store_true")
 parser.add_argument("--gpu-threads", help="number of threads to be use for the GPU", dest="gpu_threads", type=int, default=1)
 parser.add_argument('--max-memory', help='maximum amount of RAM in GB to be used', dest='max_memory', type=int)
-parser.add_argument('--video_quality', help='настроить качество выходного видео', dest='video_quality', type=int, default=18, choices=range(52), metavar='[0-51]')
+parser.add_argument('--video_quality', help='настроить качество выходного видео', dest='video_quality', type=int, default=10, choices=range(52), metavar='[0-51]')
+parser.add_argument("--frame_limit", help="Maximum number of frames to process at once", dest='frame_limit', type=int, default=1000)
 #parser.add_argument("--mem", help="Max memory", dest="cpu_threads", type=int, default=4)
 
 args = parser.parse_args()
 
-refacer = Refacer(force_cpu=args.force_cpu,tensorrt=args.tensorrt,gpu_threads=args.gpu_threads,max_memory=args.max_memory,video_quality=args.video_quality)
+refacer = Refacer(force_cpu=args.force_cpu,tensorrt=args.tensorrt,gpu_threads=args.gpu_threads,max_memory=args.max_memory,video_quality=args.video_quality,frame_limit=args.frame_limit)
 
 num_faces=args.max_num_faces
 
@@ -45,7 +46,6 @@ def run(*vars):
 origin = []
 destination = []
 thresholds = []
-upscaler = []
 upscaler = []
 upscaler_models = ['None']
 upscaler_models += [file for file in os.listdir('upscaler_models') if file.endswith('.onnx')]

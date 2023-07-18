@@ -4,7 +4,7 @@ set PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.8,max_split_size_mb:5
 set CUDA_MODULE_LOADING=LAZY
 
 call venv\Scripts\activate.bat
-python app.py --gpu-threads 4 --max-memory 16000 --autolaunch
+python app.py --gpu-threads 8 --max-memory 16000 --autolaunch --video_quality 10 --frame_limit 1000
 pause
 
 REM Упаковано и собрано телеграм каналом Neutogen News: https://t.me/neurogen_news
